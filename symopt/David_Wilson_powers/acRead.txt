@@ -1,0 +1,71 @@
+An addition chain for n is a finite increasing sequence of positive
+integers whose first element is 1, last element is n, and every element
+after the first is the sum of two previous elements in the chain. For
+example:
+
+  (1 2 4 5 8 10 13)
+
+is an addition for 13.
+
+------------------------------------------------------------------------
+A shortest addition chain for n is an addition chain for n with the
+smallest possible number of elements.  For example,
+
+  (1 2 3 6 12 13)
+
+is a shortest addition chain for 13, since there is no addition chain
+for 13 with fewer than 6 elements.
+
+------------------------------------------------------------------------
+A Brauer chain is an addition chain in which every member after the
+first is the sum of the immediately preceeding element and a previous
+element (possibly the same element).  For example,
+
+  (1 2 3 6 7 13)
+
+is a Brauer chain for n.
+
+------------------------------------------------------------------------
+A non-Brauer chain for n is an addition chain for n which is not a
+Brauer chain.  For example
+
+  (1 2 4 5 8 13)
+
+is a non-Brauer chain for 13.
+
+========================================================================
+This database records all shortest addition chains for n where
+1 <= n <= 1024.
+
+------------------------------------------------------------------------
+The file acRead.txt (this file) explains the database format.
+
+------------------------------------------------------------------------
+The file acIndx.txt includes summary statistics for the shortest
+addition chains for n.  The lines are sorted on n, and have the
+format
+
+	n siz act bct cct
+
+where
+
+	n   = last element of addition chain
+	siz = number of elements in shortest addition chain for n
+	act = number of non-Brauer shortest addition chains for n
+	bct = number of Brauer shortest addition chains for n
+	cct = act+bct = total number of shortest addition chains for n
+
+------------------------------------------------------------------------
+The file ac****.txt, where **** is a zero-padded number n, records
+all shortest addition chains for n.  For example, ac0137.txt records
+all shortest addition chains for n = 137.  Each line describes one of
+the shortest addition chains for n.  Lines are sorted in lexicographic
+order on the chain elements.  The format of each line is
+
+  a_1 = first element of chain
+  a_2 = second element of chain
+  a_3 = third element of chain
+	...
+	a_siz = last element of chain
+	type = a for non-Brauer chain, b for Brauer chain
+
