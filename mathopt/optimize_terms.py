@@ -326,6 +326,8 @@ def replace_fracpowers(expr, var):
     (x**20*y + x215_100*y*sin(x322_100), [x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
     '''
     fractional_powers = recursive_find_power(expr, var, selector=lambda x: int(x) != x and abs(x)%.25 != 0)
+    if not fractional_powers:
+        return expr, [], []
     fractional_powers = list(sorted(list(fractional_powers)))
     base_power = gcd(fractional_powers)
     powers_int = [int(i/base_power) for i in fractional_powers]
@@ -342,7 +344,7 @@ def replace_fracpowers(expr, var):
     return expr, assignments, expressions
 
     
-def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True):
+def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True, fracpows=True):
     expr = replace_inv(expr, var, var_inv)
     if horner:
         expr = horner_expr(expr, var)
@@ -357,10 +359,18 @@ def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True):
         expr, assign_tmp, expr_tmp = replace_intpowers(expr, var_inv)
         assignments += assign_tmp
         expressions += expr_tmp
+    if fracpows:
+        expr, assign_tmp, expr_tmp = replace_fracpowers(expr, var)
+        assignments += assign_tmp
+        expressions += expr_tmp
+        expr, assign_tmp, expr_tmp = replace_fracpowers(expr, var_inv)
+        assignments += assign_tmp
+        expressions += expr_tmp
+        
     return expr, assignments, expressions
 
 def optimize_expression(expr, variables, inverse_variables, horner=True,
-                        intpows=True):
+                        intpows=True, fracpows=True):
     '''
     >>> tau, delta, tau_inv, delta_inv = symbols('tau, delta, tau_inv, delta_inv')
     >>> expr = 17.2752665749999998*tau - 0.000195363419999999995*tau**1.5 + log(delta) + 2.49088803199999997*log(tau) + 0.791309508999999967*log(1 - exp(-25.36365*tau)) + 0.212236767999999992*log(1 - exp(-16.90741*tau)) - 0.197938903999999999*log(exp(87.31279*tau) + 0.666666666666667) - 13.8419280760000003 - 0.000158860715999999992/tau - 0.0000210274769000000003/tau**2 + 6.05719400000000021e-8/tau**3
@@ -375,7 +385,7 @@ def optimize_expression(expr, variables, inverse_variables, horner=True,
         expr = simplify_powers_as_fractions(expr, var)
     
     for var, var_inv in zip(variables, inverse_variables):
-        expr, assign_tmp, expr_tmp = optimize_expression_for_var(expr, var, var_inv, horner=horner, intpows=intpows)
+        expr, assign_tmp, expr_tmp = optimize_expression_for_var(expr, var, var_inv, horner=horner, intpows=intpows, fracpows=fracpows)
         assignments += assign_tmp
         expressions += expr_tmp
     return expr, assignments, expressions
