@@ -29,7 +29,7 @@ from sympy.core import Add, Mul, Number
 
 __all__ = ['replace_inv', 'replace_power_sqrts', 'horner_expr',
            'optimize_expression_for_var', 'optimize_expression',
-           'recursive_find_power']
+           'recursive_find_power', 'make_pow_sym', 'replace_intpowers']
 
 def replace_inv(expr, var, var_inv):
     '''Accepts and expression, and replaces a specified variable and replaces
@@ -206,6 +206,33 @@ def horner_expr(expr, var):
         pass
     return expr
 
+def make_pow_sym(var, power):
+    '''Create a new symbol for a specified symbol.
+    
+    >>> x = symbols('x')
+    >>> make_pow_sym(x, 100)
+    x100
+    '''
+    name = var.name + str(power)
+    sym = symbols(name)
+    return sym
+
+def replace_intpowers(expr, var):
+    '''
+    >>> x, y = symbols('x, y')
+    >>> test = x**2*sin(x**3)*y+y*x**20
+    >>> replace_intpowers(test, x)
+    x2*y*sin(x3) + x20*y
+    >>> replace_intpowers(test, y)
+    x**20*y + x**2*y*sin(x**3)
+    '''
+    powers = list(sorted(list(recursive_find_power(expr, var, selector=lambda x: int(x) == x))))
+#     chain = minimum_addition_chain_multi_heuristic(powers, small_chain_length=6)
+    replacement_vars = [make_pow_sym(var, p) for p in powers]
+    for power, replacement in zip(powers[::-1], replacement_vars[::-1]):
+        # iterate from highest to low
+        expr = expr.subs(var**power, replacement)
+    return expr
 
 def optimize_expression_for_var(expr, var, var_inv, horner=True):
     expr = replace_inv(expr, var, var_inv)
