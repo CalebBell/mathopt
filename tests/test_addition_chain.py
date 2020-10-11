@@ -1,5 +1,5 @@
 from fluids.numerics import assert_close, assert_close1d
-from symopt.addition_chain import *
+from mathopt.addition_chain import *
 
 def test_tabulated_addition_chains():
     assert 1 not in tabulated_addition_chains
