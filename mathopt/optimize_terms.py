@@ -31,6 +31,7 @@ from mathopt.addition_chain import minimum_addition_chain_multi_heuristic
 __all__ = ['replace_inv', 'replace_power_sqrts', 'horner_expr',
            'optimize_expression_for_var', 'optimize_expression',
            'recursive_find_power', 'make_pow_sym', 'replace_intpowers',
+           'replace_fracpowers',
            'integer_chain_symbolic_path', 'simplify_powers_as_fractions']
 
 def replace_inv(expr, var, var_inv):
@@ -192,27 +193,44 @@ def recursive_find_power(expr, var, powers=None, selector=lambda x: True):
 def simplify_powers_as_fractions(expr, var, max_denom=1000):
     '''Takes an expression and replaces
     
-    >>> x = symbols('x')
+    >>> x, y = symbols('x, y')
     >>> expr = x**.15 + x**.2 + x**.33 + x**.35 + x**.8 + x**1.01 + x**1.6
     >>> simplify_powers_as_fractions(expr, x)
     x**(101/100) + x**(33/100) + x**(7/20) + x**(3/20) + x**(8/5) + x**(4/5) + x**(1/5)
     >>> expr = x**.15
     >>> simplify_powers_as_fractions(expr, x)
     x**(3/20)
+    
+    >>> simplify_powers_as_fractions(x**2.15*sin(x**3.22)*y+y*x**20, x)
+    x**(43/20)*y*sin(x**(161/50)) + x**20*y
     '''
     def change_term(arg):
         coeff, exponent = arg.as_coeff_exponent(var)
-        exponent_simplified = nsimplify(exponent)
-        if exponent_simplified.denominator() <= max_denom:
-            return expr.replace(var**exponent, var**exponent_simplified)
-        return expr
-    
+        if isinstance(exponent, Number) and exponent != 0 and exponent != 1 :
+            exponent_simplified = nsimplify(exponent)
+            if exponent_simplified.denominator() <= max_denom:
+                return arg.replace(var**exponent, var**exponent_simplified)
+            return arg
+        else:
+            if isinstance(arg, Mul):
+                base = 1
+                for a in arg.args:
+                    base *= simplify_powers_as_fractions(a, var, max_denom)
+                return base
+            return arg
+
+
     if isinstance(expr, Add):
+        base = 0
         for i in range(len(expr.args)):
-            expr = change_term(expr.args[i])
+            base += change_term(expr.args[i])
+        return base
     elif isinstance(expr, Mul) or isinstance(expr, Pow):
-        expr = change_term(expr)
-    return expr
+        return change_term(expr)
+    elif isinstance(expr, Function):
+        return type(expr)(*(simplify_powers_as_fractions(v, var, max_denom) for v in expr.args))
+    else:
+        return expr
 
 def horner_expr(expr, var):
     '''Basic wrapper around sympy's horner which does not raise an exception if
@@ -233,7 +251,7 @@ def horner_expr(expr, var):
         pass
     return expr
 
-def make_pow_sym(var, power):
+def make_pow_sym(var, power, suffix=''):
     '''Create a new symbol for a specified symbol.
     
     >>> x = symbols('x')
@@ -243,12 +261,13 @@ def make_pow_sym(var, power):
     x
     '''
     if power == 1:
-        return var
-    name = var.name + str(power)
+        name = var.name + suffix
+    else:
+        name = var.name + str(power) + suffix
     sym = symbols(name)
     return sym
 
-def integer_chain_symbolic_path(chain, var):
+def integer_chain_symbolic_path(chain, var, suffix=''):
     '''Returns a tuple of assignments, expressions which can be joined together
     to calculate all of the necessary powers for an operation.
     
@@ -261,21 +280,19 @@ def integer_chain_symbolic_path(chain, var):
     expressions = []
     for l in chain:
         for i, v in enumerate(l):
-            to_add_asign = make_pow_sym(var, v)
+            to_add_asign = make_pow_sym(var, v, suffix)
             if i == 0:
                 assert v == 2
-                to_add_expr = UnevaluatedExpr(var)*var
+                to_add_expr = UnevaluatedExpr(make_pow_sym(var, 1, suffix))*make_pow_sym(var, 1, suffix)
             else:
                 prev = l[i-1]
                 delta = v-l[i-1]
-                to_add_expr = UnevaluatedExpr(make_pow_sym(var, prev))*make_pow_sym(var, delta)
+                to_add_expr = UnevaluatedExpr(make_pow_sym(var, prev, suffix))*make_pow_sym(var, delta, suffix)
             
             if to_add_asign not in assignments:
                 assignments.append(to_add_asign)
                 expressions.append(to_add_expr)
     return assignments, expressions
-
-    
     
 def replace_intpowers(expr, var):
     '''
@@ -300,7 +317,31 @@ def replace_intpowers(expr, var):
         expr = expr.subs(var**power, replacement)
     return expr, assignments, expressions
 
+def replace_fracpowers(expr, var):
+    '''
+    >>> x, y = symbols('x, y')
+    >>> test = x**2.15*sin(x**3.22)*y+y*x**20
+    >>> test = simplify_powers_as_fractions(test, x)
+    >>> replace_fracpowers(test, x)
+    (x**20*y + x215_100*y*sin(x322_100), [x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
+    '''
+    fractional_powers = recursive_find_power(expr, var, selector=lambda x: int(x) != x and abs(x)%.25 != 0)
+    fractional_powers = list(sorted(list(fractional_powers)))
+    base_power = gcd(fractional_powers)
+    powers_int = [int(i/base_power) for i in fractional_powers]
+    prefix = '_' + str(base_power.numerator()) 
+    suffix = '_' + str(base_power.denominator())
+    var_suffix = symbols(var.name + prefix)
+    
+    chain_length, chain = minimum_addition_chain_multi_heuristic(powers_int, small_chain_length=6)
+    assignments, expressions = integer_chain_symbolic_path(chain, var, suffix)
+    replacement_vars = [make_pow_sym(var, p, suffix) for p in powers_int]
+    for power, replacement in zip(fractional_powers[::-1], replacement_vars[::-1]):
+        # iterate from highest to low
+        expr = expr.subs(var**power, replacement)
+    return expr, assignments, expressions
 
+    
 def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True):
     expr = replace_inv(expr, var, var_inv)
     if horner:

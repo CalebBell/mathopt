@@ -67,7 +67,7 @@ setup(
     keywords=keywords,
     classifiers=classifiers,
     package_data={
-        'fluids': [
+        'mathopt': [
             'David_Wilson_powers/*',
         ]
     },
