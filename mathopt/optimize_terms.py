@@ -324,6 +324,13 @@ def replace_fracpowers(expr, var):
     >>> test = simplify_powers_as_fractions(test, x)
     >>> replace_fracpowers(test, x)
     (x**20*y + y*x215_100*sin(x322_100), [x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
+
+    >>> tau, delta = symbols('tau, delta')
+    >>> test = - 0.042053322884200002*delta**4*tau**0.200000000000000011 + 0.0349008431981999989*delta**4*tau**0.349999999999999978 
+    >>> test = simplify_powers_as_fractions(test, tau)
+    >>> test = simplify_powers_as_fractions(test, delta)
+    >>> replace_fracpowers(test, tau)
+    (-0.0420533228842*delta**4*tau4_20 + 0.0349008431982*delta**4*tau7_20, [tau2_20, tau4_20, tau6_20, tau7_20], [tau_20*tau_20, tau2_20*tau2_20, tau2_20*tau4_20, tau_20*tau6_20])
     '''
     fractional_powers = recursive_find_power(expr, var, selector=lambda x: int(x) != x and abs(x)%.25 != 0)
     if not fractional_powers:
