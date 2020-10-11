@@ -56,7 +56,7 @@ setup(
     packages=['mathopt'],
     license='MIT',
     version='0.1.1',
-    download_url='https://github.com/CalebBell/sympopt/tarball/0.1.1',
+    download_url='https://github.com/CalebBell/mathopt/tarball/0.1.1',
     description=description,
     long_description=open('README.rst').read(),
     install_requires=["sympy"],
