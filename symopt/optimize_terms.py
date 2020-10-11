@@ -25,10 +25,11 @@ from __future__ import division
 
 from sympy import *
 from math import isclose
-from sympy.core import Add, Mul
+from sympy.core import Add, Mul, Number
 
 __all__ = ['replace_inv', 'replace_power_sqrts', 'horner_expr',
-           'optimize_expression_for_var', 'optimize_expression']
+           'optimize_expression_for_var', 'optimize_expression',
+           'recursive_find_power']
 
 def replace_inv(expr, var, var_inv):
     '''Accepts and expression, and replaces a specified variable and replaces
@@ -88,10 +89,20 @@ def replace_power_sqrts(expr, var):
     >>> replace_power_sqrts(x**-35.5*y, x)
     y*sqrt(x)/x**36
     >>> replace_power_sqrts(x**-.5*y, x)
-    y*sqrt(x)/x
-    
+    y/sqrt(x)
     >>> replace_power_sqrts(x**35.25*y, x)
     x**35*y*sqrt(sqrt(x))
+    >>> replace_power_sqrts(x**.25*y, x)
+    y*sqrt(sqrt(x))
+    >>> replace_power_sqrts(x**.75*y, x)
+    y*sqrt(sqrt(x))*sqrt(x)
+    
+    Can't figure out how to make -1 be a division
+    
+    >>> replace_power_sqrts(x**-.25*y, x)
+    y*(sqrt(sqrt(x)))**(-1)
+    >>> replace_power_sqrts(x**-.75*y, x)
+    y*(sqrt(sqrt(x))*sqrt(x))**(-1)
     '''
     new = 0
     def change_term(arg):
@@ -100,21 +111,40 @@ def replace_power_sqrts(expr, var):
             
             pow_float_rem = float(power %1)
             is05 = isclose(pow_float_rem, 0.5, rel_tol=1e-12)
-            is025 = isclose(pow_float_rem, 0.25, rel_tol=1e-12)
-            is075 = isclose(pow_float_rem, 0.75, rel_tol=1e-12)
+            is025 = (power == -0.25 or isclose(pow_float_rem, 0.25, rel_tol=1e-12)) and not power == -0.75
+            is075 = power == -0.75 or isclose(pow_float_rem, 0.75, rel_tol=1e-12)
             if is05:
-                new_power = int(power - .5)
+                if power == -0.5:
+                    new_power = 0
+                else:
+                    new_power = int(power - .5)
             elif is025:
-                new_power = int(power - .25) 
+                if power == -0.25:
+                    new_power = 0
+                else:
+                    new_power = int(power - .25)
             elif is075:
-                new_power = int(power - .75) 
+                if power == -0.75:
+                    new_power = 0
+                else:
+                    new_power = int(power - .75)
                 
             if is05:
-                unev = UnevaluatedExpr(sqrt(var))
+                if power == -0.5:
+                    # Removing power completely
+                    unev = 1/sqrt(var)
+                else:
+                    unev = UnevaluatedExpr(sqrt(var))
             elif is025:
-                unev = UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var))))
+                if power == -0.25:
+                    unev = UnevaluatedExpr(1/UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var)))))
+                else:
+                    unev = UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var))))
             elif is075:
-                unev = UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var))))*UnevaluatedExpr(sqrt(var))
+                if power == -0.75:
+                    unev = UnevaluatedExpr(1/((UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var))))*UnevaluatedExpr(sqrt(var)))))
+                else:
+                    unev = UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var))))*UnevaluatedExpr(sqrt(var))
                 
             if is05 or is025 or is075:
                 arg = factor*unev*var**(new_power)
@@ -126,6 +156,36 @@ def replace_power_sqrts(expr, var):
     elif isinstance(expr, Mul):
         new = change_term(expr)
     return new
+
+def recursive_find_power(expr, var, powers=None, selector=lambda x: True):
+    '''Recursively find all powers of `var` in `expr`. Optionally, a selection
+    criteria such as only finding integers an be applied.
+
+    Does not return 0 or 1 obviously.
+    
+    >>> x, y = symbols('x, y')
+    >>> test = x**3*log(x**2)*sin(x**20)*y**5*exp(log(sin(x**8))) + y**3*x**15
+    >>> list(sorted(list(recursive_find_power(test, x))))
+    [2, 3, 8, 15, 20]
+    >>> list(sorted(list(recursive_find_power(test, x, selector=lambda x: x > 3))))
+    [8, 15, 20]
+    >>> list(sorted(list(recursive_find_power(test,y))))
+    [3, 5]
+    >>> test = x**3.1*log(x**2.2)*sin(x**20.5)*y**5*exp(log(sin(x**8))) + y**3*x**15
+    >>> list(sorted(list(recursive_find_power(test, x))))
+    [2.20000000000000, 3.10000000000000, 8, 15, 20.5000000000000]
+    >>> list(sorted(list(recursive_find_power(test, x, selector=lambda x: int(x) == x))))
+    [8, 15]
+    '''
+    if powers is None:
+        powers = set([])
+    for arg in expr.args:
+        coeff, exponent = arg.as_coeff_exponent(var)
+        if isinstance(exponent, Number) and exponent != 0 and exponent != 1 and selector(exponent):
+            powers.add(exponent)
+        else:
+            recursive_find_power(arg, var, powers, selector)
+    return powers
 
 def horner_expr(expr, var):
     '''Basic wrapper around sympy's horner which does not raise an exception if
