@@ -52,8 +52,8 @@ description = 'Library for mathematical optimization for sympy'
 keywords = ('math optimization sympy')
 
 setup(
-    name='symopt',
-    packages=['symopt'],
+    name='mathopt',
+    packages=['mathopt'],
     license='MIT',
     version='0.1.1',
     download_url='https://github.com/CalebBell/sympopt/tarball/0.1.1',
@@ -63,7 +63,7 @@ setup(
     author='Caleb Bell',
     author_email='Caleb.Andrew.Bell@gmail.com',
     platforms=['Windows', 'Linux', 'Mac OS', 'Unix'],
-    url='https://github.com/CalebBell/symopt',
+    url='https://github.com/CalebBell/mathopt',
     keywords=keywords,
     classifiers=classifiers,
     package_data={

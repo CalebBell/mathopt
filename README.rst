@@ -1,6 +1,6 @@
-======
-symopt
-======
+==========
+MathTricks
+==========
 
 After years of using SymPy to optimize expressions, it is time to begin formalizing some of the optimizations I use it for into a library. 
 This library will be focused on development work only - i.e. it would never be a dependency of another package. 

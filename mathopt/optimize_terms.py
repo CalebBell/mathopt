@@ -26,7 +26,7 @@ from __future__ import division
 from sympy import *
 from math import isclose
 from sympy.core import Add, Mul, Number
-from .addition_chain import minimum_addition_chain_multi_heuristic
+from mathopt.addition_chain import minimum_addition_chain_multi_heuristic
 
 __all__ = ['replace_inv', 'replace_power_sqrts', 'horner_expr',
            'optimize_expression_for_var', 'optimize_expression',
@@ -300,6 +300,7 @@ def replace_intpowers(expr, var):
         expr = expr.subs(var**power, replacement)
     return expr, assignments, expressions
 
+
 def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True):
     expr = replace_inv(expr, var, var_inv)
     if horner:
@@ -328,6 +329,10 @@ def optimize_expression(expr, variables, inverse_variables, horner=True,
     '''
     assignments = []
     expressions = []
+    
+    for var in variables:
+        expr = simplify_powers_as_fractions(expr, var)
+    
     for var, var_inv in zip(variables, inverse_variables):
         expr, assign_tmp, expr_tmp = optimize_expression_for_var(expr, var, var_inv, horner=horner, intpows=intpows)
         assignments += assign_tmp
