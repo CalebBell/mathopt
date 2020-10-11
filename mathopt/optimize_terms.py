@@ -314,7 +314,7 @@ def replace_intpowers(expr, var):
     replacement_vars = [make_pow_sym(var, p) for p in powers]
     for power, replacement in zip(powers[::-1], replacement_vars[::-1]):
         # iterate from highest to low
-        expr = expr.subs(var**power, replacement)
+        expr = expr.replace(var**power, replacement)
     return expr, assignments, expressions
 
 def replace_fracpowers(expr, var):
@@ -323,7 +323,7 @@ def replace_fracpowers(expr, var):
     >>> test = x**2.15*sin(x**3.22)*y+y*x**20
     >>> test = simplify_powers_as_fractions(test, x)
     >>> replace_fracpowers(test, x)
-    (x**20*y + x215_100*y*sin(x322_100), [x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
+    (x**20*y + y*x215_100*sin(x322_100), [x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
     '''
     fractional_powers = recursive_find_power(expr, var, selector=lambda x: int(x) != x and abs(x)%.25 != 0)
     if not fractional_powers:
@@ -338,9 +338,13 @@ def replace_fracpowers(expr, var):
     chain_length, chain = minimum_addition_chain_multi_heuristic(powers_int, small_chain_length=6)
     assignments, expressions = integer_chain_symbolic_path(chain, var, suffix)
     replacement_vars = [make_pow_sym(var, p, suffix) for p in powers_int]
+    
+#    subs = {var**power: replacement for power, replacement in zip(fractional_powers[::-1], replacement_vars[::-1])}
+#    subs = {var**power: replacement for power, replacement in zip(fractional_powers, replacement_vars)}
+#    expr = expr.subs(subs, simultaneous=True)
     for power, replacement in zip(fractional_powers[::-1], replacement_vars[::-1]):
-        # iterate from highest to low
-        expr = expr.subs(var**power, replacement)
+#        iterate from highest to low
+        expr = expr.replace(var**power, UnevaluatedExpr(replacement))
     return expr, assignments, expressions
 
     
