@@ -69,7 +69,8 @@ def replace_inv(expr, var, var_inv):
         numer, denom = fraction(arg)
         str_denom = str(denom)
         if find_pow_inv in str_denom or find_inv in str_denom and not '(' in str_denom:
-            arg = arg.subs(1/var, var_inv)
+            coeff, power = denom.as_coeff_exponent(var)
+            arg = arg.replace(1/var**power, var_inv**power)
         return arg
 
     if isinstance(expr, Add):
@@ -323,7 +324,7 @@ def replace_fracpowers(expr, var):
     >>> test = x**2.15*sin(x**3.22)*y+y*x**20
     >>> test = simplify_powers_as_fractions(test, x)
     >>> replace_fracpowers(test, x)
-    (x**20*y + y*x215_100*sin(x322_100), [x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
+    (x**20*y + x215_100*y*sin(x322_100), [x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
 
     >>> tau, delta = symbols('tau, delta')
     >>> test = - 0.042053322884200002*delta**4*tau**0.200000000000000011 + 0.0349008431981999989*delta**4*tau**0.349999999999999978 
@@ -351,16 +352,16 @@ def replace_fracpowers(expr, var):
 #    expr = expr.subs(subs, simultaneous=True)
     for power, replacement in zip(fractional_powers[::-1], replacement_vars[::-1]):
 #        iterate from highest to low
-        expr = expr.replace(var**power, UnevaluatedExpr(replacement))
+        expr = expr.replace(var**power, replacement)
     return expr, assignments, expressions
 
     
 def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True, fracpows=True):
+    expr = replace_power_sqrts(expr, var)
     expr = replace_inv(expr, var, var_inv)
     if horner:
         expr = horner_expr(expr, var)
         expr = horner_expr(expr, var_inv)
-    expr = replace_power_sqrts(expr, var)
     assignments = []
     expressions = []
     if intpows:
