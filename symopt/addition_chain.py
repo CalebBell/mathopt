@@ -21,7 +21,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+
 from __future__ import division
+
+__all__ = ['addition_chain_length', 'tabulated_addition_chains',
+           'minimum_addition_chain_multi', 'minimum_addition_chain_multi_heuristic']
+import os
+from itertools import product, permutations, combinations
 
 
 shortest_path_costs = {1:1, 2:2, 3:3, 4:3, 5:4, 6:4, 7:5, 8:4, 9:5, 10:5, 11:6, 12:5, 13:6, 14:6,
@@ -54,13 +60,173 @@ shortest_path_costs = {1:1, 2:2, 3:3, 4:3, 5:4, 6:4, 7:5, 8:4, 9:5, 10:5, 11:6, 
                        315:12, 316:12, 317:12, 318:12, 319:12, 320:10, 321:11, 322:11, 323:11}
 
 def addition_chain_length(power):
+    r'''Calculates the number of multiplies required to calculate a power using
+    addition-chain exponentiation.
+
+    Parameters
+    ----------
+    power : int
+        Exponent, [-]
+
+    Returns
+    -------
+    multiplies : int
+        Number of multiplies for the optimal addition chain [-]
+
+    Notes
+    -----
+
+    Examples
+    --------
+    >>> addition_chain_length(128)
+    8
+
+    '''    
     return shortest_path_costs[power]
 
-def addition_chains_naive_length(powers):
-    '''U
+
+def minimum_addition_chain_multi(powers):
+    r'''Given a series of different exponents of a variable, determine the
+    minimum addition chain length which computes all of the powers.
+    
+    This function operates of tabulated values for powers under 1000 only.
+    This function has approximately factorial(len(powers)) time characteristic.
+
+    Parameters
+    ----------
+    powers : list[int]
+        Exponents to find addition chain for, [-]
+
+    Returns
+    -------
+    length : int
+        Number of multiplies required to compute all powers
+    steps : list[list[int]]
+        List of steps required to compute the powers [-]
+
+    Notes
+    -----
+
+    Examples
+    --------
+    >>> minimum_addition_chain_multi([3, 5, 11])
+    (5, [[2, 3], [2, 3, 5], [2, 3, 5, 10, 11]])
+
+    '''    
+    min_lengh = 1000000000
+    min_steps = None
+    things_to_try = [tabulated_addition_chains[p] for p in powers]
+    base = set()
+    for multi_steps in product(*things_to_try):
+        for v in multi_steps:
+            base.update(v)
+        N = len(base)
+        if N <= min_lengh:
+            min_lengh = N
+            min_steps = multi_steps
+        base.clear()
+    return min_lengh, list(min_steps)
+
+def minimum_addition_chain_multi_heuristic(powers, small_chain_length=6):
+    r'''Given a series of different exponents of a variable, determine the
+    minimum addition chain length which computes all of the powers.
+    
+    This function operates of tabulated values for powers under 1000 only.
+
+    This function uses heuristics to compute the answer, with the risk of not
+    finding exactly the shortest chain.
+    
+    Parameters
+    ----------
+    powers : list[int]
+        Exponents to find addition chain for, [-]
+    small_chain_length : int
+        The number of variables rp process at once
+
+    Returns
+    -------
+    length : int
+        Number of multiplies required to compute all powers
+    steps : list[list[int]]
+        List of steps required to compute the powers [-]
+
+    Notes
+    -----
+
+    Examples
+    --------
+    >>> minimum_addition_chain_multi_heuristic([3, 5, 11])
+    (5, [[2, 3], [2, 3, 5], [2, 3, 5, 10, 11]])
+
+    
     '''
-    # Find set of intermediaries needed for each power
-    tot = 0
-    for p in powers:
-        tot += shortest_path_costs[p]
-    return tot
+    min_lengh = 1000000000
+    min_steps = None
+    powers = list(sorted(powers))
+    
+    small_power_chain = powers[0:small_chain_length]
+#    small_power_chain = [i for i in powers if i < max_power_small][0:small_chain_length]
+    small_length, small_steps = minimum_addition_chain_multi(small_power_chain)
+    small_exponents = set([])
+    for l in small_steps:
+        for p in l:
+            small_exponents.add(p)
+#    print('small chain', small_power_chain, small_exponents)
+            
+    remaining_powers = [i for i in powers if i not in small_power_chain]
+    things_to_try = [tabulated_addition_chains[p] for p in remaining_powers]
+    things_to_try_shortened = []
+    
+    shorts_to_original = {}
+    for i in range(len(remaining_powers)):
+        shorts_to_original[i] = {}
+        
+        new_lengths_i = []
+        power_possibilities = things_to_try[i]
+#         print('Initial', len(power_possibilities))
+        for l in power_possibilities:
+            l2 = [v for v in l if v not in small_exponents]
+            new_lengths_i.append((len(l2), l2, l))
+        new_lengths_i.sort()
+        min_length_i = new_lengths_i[0][0]
+        final_lengths_i = []
+        
+        for length, l, orig in new_lengths_i:
+            if length == min_length_i:
+                final_lengths_i.append(l)
+                shorts_to_original[i][tuple(l)] = orig
+                
+        things_to_try_shortened.append(final_lengths_i)
+
+    for multi_steps in product(*things_to_try_shortened):
+        base = set()
+        for v in multi_steps:
+            base.update(v)
+        if len(base) <= min_lengh:
+            min_lengh = len(base)
+            min_steps = multi_steps
+            
+    min_steps = list(min_steps)
+        
+    for i in range(len(remaining_powers)):
+        min_steps[i] = shorts_to_original[i][tuple(min_steps[i])]
+    
+    return small_length+min_lengh, list(small_steps) + min_steps
+
+
+
+tabulated_addition_chains = {}
+'''Dictionary of integer: list[list[int]] where each sub list is an addition
+chain of minimum length.
+'''
+
+folder = os.path.join(os.path.dirname(__file__), 'David_Wilson_powers')
+for num in range(2, 1000):
+# for num in range(2, 306):
+    name = 'ac{:04d}.txt'.format(num)
+    dat = open(os.path.join(folder, name)).readlines()
+    int_options = []
+    for line in dat:
+        steps = [int(i) for i in line[2:-3].split(' ')]
+        int_options.append(steps)
+    tabulated_addition_chains[num] = int_options

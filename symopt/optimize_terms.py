@@ -26,6 +26,8 @@ from __future__ import division
 from sympy import *
 from math import isclose
 
+__all__ = ['replace_inv', 'replace_power_sqrts']
+
 def replace_inv(expr, var, var_inv):
     '''Accepts and expression, and replaces a specified variable and replaces
     it by its inverse where ever its inverse is used.
