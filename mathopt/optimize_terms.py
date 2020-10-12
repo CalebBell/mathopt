@@ -60,6 +60,12 @@ def replace_inv(expr, var, var_inv):
     >>> expr = simplify_powers_as_fractions(expr, delta)
     >>> replace_inv(expr, tau, tau_inv)
     -0.008*delta**4*tau_inv**(4/5) + 0.16*delta*tau**(3/5)*exp(-delta) + 0.23*delta*tau_inv**(67/100)
+    
+    Case where replacement was not happening because of depth
+
+    >>> expr = delta*(0.1*delta**10*tau**(5/4)*exp(-delta**2) - 0.03*delta**5*tau_inv**(3/4)*exp(-delta))
+    >>> replace_power_sqrts(expr, tau)
+    (delta*(0.1*delta**10*tau*taurt4*exp(-delta**2) - 0.03*delta**5*tau_inv**0.75*exp(-delta)), [taurt2, taurt4], [sqrt(tau), sqrt(taurt2)])
         
     Cases where replacement does not happen
     
@@ -132,7 +138,7 @@ def replace_power_sqrts(expr, var):
         sym = symbols(name)
         return sym
         
-    def change_term(arg):
+    def change_term(arg, assignments, expressions):
         factor, power = arg.as_coeff_exponent(var)
         if isinstance(power, Number):
             
@@ -199,9 +205,19 @@ def replace_power_sqrts(expr, var):
     
     if isinstance(expr, Add):
         for arg in expr.args:
-            new += change_term(arg)
+            new += change_term(arg, assignments, expressions)
+    elif isinstance(expr, Pow):
+        new = change_term(expr, assignments, expressions)
     elif isinstance(expr, Mul):
-        new = change_term(expr)
+        #new = change_term(expr)
+        new = 1
+        for arg in expr.args:
+            to_mul, temp_assign, temp_expr = replace_power_sqrts(arg, var)
+            new *= to_mul
+            assignments += temp_assign
+            expressions += temp_expr
+    elif isinstance(expr, (Number, Pow, Function, Symbol)) or 1:
+        return expr, [], []
     return new, assignments, expressions
 
 def recursive_find_power(expr, var, powers=None, selector=lambda x: True):
