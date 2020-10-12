@@ -66,7 +66,9 @@ def replace_inv(expr, var, var_inv):
     >>> replace_inv(sin(x) + 1/sin(x), x, x_inv)
     sin(x) + 1/sin(x)
     
-    
+    >>> expr = tau_inv*(tau_inv*(tau_inv*(4.20549538e-5 - 1.8171582e-7*tau_inv) + 0.000158860716) + 2.490888032)
+    >>> replace_inv(expr, delta, delta_inv)
+    tau_inv*(tau_inv*(tau_inv*(4.20549538e-5 - 1.8171582e-7*tau_inv) + 0.000158860716) + 2.490888032)
     '''
     new = 0
     find_pow_inv = str(var)+'**-'
@@ -84,7 +86,13 @@ def replace_inv(expr, var, var_inv):
         for arg in expr.args:
             new += change_term(arg)
     elif isinstance(expr, Mul):
-        new = change_term(expr)
+        new = 1
+        for arg in expr.args:
+            new *= replace_inv(arg, var, var_inv)
+    elif isinstance(expr, (Number, Pow, Function, Symbol)) or 1:
+        new = expr
+    else:
+        new = 0
     return new
 
 
