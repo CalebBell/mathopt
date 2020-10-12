@@ -393,7 +393,8 @@ def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True, f
     assignments += assign_tmp
     expressions += expr_tmp
     if horner:
-        expr = horner_expr(expr, var)
+        if var in expr.free_symbols:
+            expr = horner_expr(expr, var)
         if var_inv in expr.free_symbols:
             expr = horner_expr(expr, var_inv)
     if intpows:
@@ -421,6 +422,9 @@ def optimize_expression(expr, variables, inverse_variables, horner=True,
     >>> optimize_expression(expr, [tau,delta], [tau_inv, delta_inv])[0]
     -0.00019536342*tau*taurt2 + 17.275266575*tau + tau_inv*(tau_inv*(6.057194e-8*tau_inv - 2.10274769e-5) - 0.000158860716) + log(delta) + 2.490888032*log(tau) + 0.791309509*log(1 - exp(-25.36365*tau)) + 0.212236768*log(1 - exp(-16.90741*tau)) - 0.197938904*log(exp(87.31279*tau) + 0.666666666666667) - 13.841928076
     
+    >>> expr =  2.490888032/tau + 0.000158860716/tau**2 + 4.20549538e-5/tau**3 - 1.8171582e-7/tau**4
+    >>> optimize_expression(expr, [tau,delta], [tau_inv, delta_inv])[0]
+    tau_inv*(tau_inv*(tau_inv*(4.20549538e-5 - 1.8171582e-7*tau_inv) + 0.000158860716) + 2.490888032)
     '''
     assignments = []
     expressions = []
