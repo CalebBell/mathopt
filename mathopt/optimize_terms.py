@@ -380,6 +380,11 @@ def replace_fracpowers(expr, var):
     >>> replace_fracpowers(expr, tau_inv)
     (-0.008*delta**4*tau_inv80_100 + 0.16*delta*tau**(3/5)*exp(-delta) + 0.23*delta*tau_inv67_100, [tau_inv_100, tau_inv2_100, tau_inv4_100, tau_inv8_100, tau_inv16_100, tau_inv32_100, tau_inv64_100, tau_inv66_100, tau_inv67_100, tau_inv80_100], [tau_inv**0.01, tau_inv_100*tau_inv_100, tau_inv2_100*tau_inv2_100, tau_inv4_100*tau_inv4_100, tau_inv8_100*tau_inv8_100, tau_inv16_100*tau_inv16_100, tau_inv32_100*tau_inv32_100, tau_inv2_100*tau_inv64_100, tau_inv_100*tau_inv66_100, tau_inv16_100*tau_inv64_100])
 
+    >>> expr = - 1.6*delta*tau**(1/100) - 0.5*delta*tau**(13/5)*exp(-delta**2) - 0.16*delta*tau**(3/5)*exp(-delta) 
+    >>> expr = simplify_powers_as_fractions(expr, tau)
+    >>> replace_fracpowers(expr, tau)
+    (-0.5*delta*tau260_100*exp(-delta**2) - 0.16*delta*tau60_100*exp(-delta) - 1.6*delta*tau_100, [tau_100, tau2_100, tau4_100, tau8_100, tau16_100, tau20_100, tau40_100, tau60_100, tau32_100, tau64_100, tau128_100, tau256_100, tau260_100], [tau**0.01, tau_100*tau_100, tau2_100*tau2_100, tau4_100*tau4_100, tau8_100*tau8_100, tau4_100*tau16_100, tau20_100*tau20_100, tau20_100*tau40_100, tau16_100*tau16_100, tau32_100*tau32_100, tau64_100*tau64_100, tau128_100*tau128_100, tau4_100*tau256_100])
+
     '''
     fractional_powers = recursive_find_power(expr, var, selector=lambda x: int(x) != x and abs(x)%.25 != 0)
     if not fractional_powers or len(fractional_powers) == 1:
@@ -387,6 +392,7 @@ def replace_fracpowers(expr, var):
     fractional_powers = list(sorted(list(fractional_powers)))
     base_power = gcd(fractional_powers)
     powers_int = [int(i/base_power) for i in fractional_powers]
+    powers_int = [i for i in powers_int if i != 1] # Remove the base_power if it appears as it is handled separately
     prefix = '_' + str(base_power.numerator()) 
     suffix = '_' + str(base_power.denominator())
     var_suffix = symbols(var.name + suffix)
@@ -401,6 +407,9 @@ def replace_fracpowers(expr, var):
     for power, replacement in zip(fractional_powers[::-1], replacement_vars[::-1]):
 #        iterate from highest to low
         expr = expr.replace(var**power, replacement)
+
+    # Handle the case the base power is in there already
+    expr = expr.replace(var**base_power, var_suffix)
         
     assignments.insert(0, var_suffix)
     expressions.insert(0, var**float(base_power))
