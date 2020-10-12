@@ -51,13 +51,20 @@ def replace_inv(expr, var, var_inv):
     >>> expr = 0.000233594806142*delta**11*tau**3.25*exp(-delta**2)
     >>> replace_inv(expr, tau, tau_inv)
     0.000233594806142*delta**11*tau**3.25*exp(-delta**2)
-    
+
+    Case where replacement wasn't happening because of a bracket:
+        
+    >>> tau, delta, tau_inv, delta_inv = symbols('tau, delta, tau_inv, delta_inv')
+    >>> expr = 0.16*delta*tau**(3/5)*exp(-delta) +0.23*delta/tau**(67/100) - 0.008*delta**4/tau**(4/5)
+    >>> expr = simplify_powers_as_fractions(expr, tau)
+    >>> expr = simplify_powers_as_fractions(expr, delta)
+    >>> replace_inv(expr, tau, tau_inv)
+    -0.008*delta**4*tau_inv**(4/5) + 0.16*delta*tau**(3/5)*exp(-delta) + 0.23*delta*tau_inv**(67/100)
+        
     Cases where replacement does not happen
     
     >>> replace_inv(sin(x) + 1/sin(x), x, x_inv)
     sin(x) + 1/sin(x)
-    
-    
     
     
     '''
@@ -68,7 +75,7 @@ def replace_inv(expr, var, var_inv):
     def change_term(arg):
         numer, denom = fraction(arg)
         str_denom = str(denom)
-        if find_pow_inv in str_denom or find_inv in str_denom and not '(' in str_denom:
+        if find_pow_inv in str_denom or find_inv in str_denom: #and not '(' in str_denom:
             coeff, power = denom.as_coeff_exponent(var)
             arg = arg.replace(1/var**power, var_inv**power)
         return arg
