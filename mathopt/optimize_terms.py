@@ -85,30 +85,38 @@ def replace_power_sqrts(expr, var):
     '''
     >>> x, y = symbols('x, y')
     >>> replace_power_sqrts(x**Rational(3,2)*y, x)
-    x*y*sqrt(x)
+    (x*xrt2*y, [xrt2], [sqrt(x)])
     >>> replace_power_sqrts(x**Rational(7,2)*y, x)
-    x**3*y*sqrt(x)
+    (x**3*xrt2*y, [xrt2], [sqrt(x)])
     >>> replace_power_sqrts(x**35.5*y, x)
-    x**35*y*sqrt(x)
+    (x**35*xrt2*y, [xrt2], [sqrt(x)])
     >>> replace_power_sqrts(x**-35.5*y, x)
-    y*sqrt(x)/x**36
+    (xrt2*y/x**36, [xrt2], [sqrt(x)])
     >>> replace_power_sqrts(x**-.5*y, x)
-    y/sqrt(x)
+    (xrt2inv*y, [xrt2inv], [1/sqrt(x)])
     >>> replace_power_sqrts(x**35.25*y, x)
-    x**35*y*sqrt(sqrt(x))
+    (x**35*xrt4*y, [xrt2, xrt4], [sqrt(x), sqrt(xrt2)])
     >>> replace_power_sqrts(x**.25*y, x)
-    y*sqrt(sqrt(x))
+    (xrt4*y, [xrt2, xrt4], [sqrt(x), sqrt(xrt2)])
     >>> replace_power_sqrts(x**.75*y, x)
-    y*sqrt(sqrt(x))*sqrt(x)
-    
-    Can't figure out how to make -1 be a division
+    (xrt2*xrt4*y, [xrt2, xrt4], [sqrt(x), sqrt(xrt2)])
     
     >>> replace_power_sqrts(x**-.25*y, x)
-    y*(sqrt(sqrt(x)))**(-1)
+    (xrt4inv*y, [xrt2, xrt4, xrt4inv], [sqrt(x), sqrt(xrt2), 1/xrt4inv])
     >>> replace_power_sqrts(x**-.75*y, x)
-    y*(sqrt(sqrt(x))*sqrt(x))**(-1)
+    (xrt34inv*y, [xrt2, xrt4, xrt34inv], [sqrt(x), sqrt(xrt2), 1/(xrt2*xrt4)])
+    
+    >>> replace_power_sqrts(x**1.5*y+ x**1.5, x)
+    (x*xrt2*y + x*xrt2, [xrt2], [sqrt(x)])
     '''
+    assignments = []
+    expressions = []
     new = 0
+    def newvar(var, root, suffix=''):
+        name = var.name + 'rt' + str(root) + suffix
+        sym = symbols(name)
+        return sym
+        
     def change_term(arg):
         factor, power = arg.as_coeff_exponent(var)
         if isinstance(power, Number):
@@ -133,25 +141,45 @@ def replace_power_sqrts(expr, var):
                 else:
                     new_power = int(power - .75)
                 
-            if is05:
+            if is05 or is025 or is075:
                 if power == -0.5:
                     # Removing power completely
-                    unev = 1/sqrt(var)
+                    rtvar = newvar(var, 2, 'inv')
+                    rtexpr = 1/sqrt(var)
                 else:
-                    unev = UnevaluatedExpr(sqrt(var))
-            elif is025:
+                    rtvar = newvar(var, 2)
+                    rtexpr = sqrt(var)
+                if rtvar not in assignments:
+                    assignments.append(rtvar)
+                    expressions.append(rtexpr)
+
+            if is025 or is075:
+                rtexpr = sqrt(rtvar)
+                rtvar = newvar(var, 4)
+                if rtvar not in assignments:
+                    assignments.append(rtvar)
+                    expressions.append(rtexpr)
+            if is025:
                 if power == -0.25:
-                    unev = UnevaluatedExpr(1/UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var)))))
+                    rtvar = newvar(var, 4, 'inv')
+                    rtexpr = 1/rtvar
+                    if rtvar not in assignments:
+                        assignments.append(rtvar)
+                        expressions.append(rtexpr)
                 else:
-                    unev = UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var))))
+                    pass
             elif is075:
                 if power == -0.75:
-                    unev = UnevaluatedExpr(1/((UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var))))*UnevaluatedExpr(sqrt(var)))))
+                    rtexpr = 1/(rtvar*assignments[-2])
+                    rtvar = newvar(var, 34, 'inv')
+                    if rtvar not in assignments:
+                        assignments.append(rtvar)
+                        expressions.append(rtexpr)
                 else:
-                    unev = UnevaluatedExpr(sqrt(UnevaluatedExpr(sqrt(var))))*UnevaluatedExpr(sqrt(var))
+                    rtvar = rtvar*assignments[-2]
                 
             if is05 or is025 or is075:
-                arg = factor*unev*var**(new_power)
+                arg = factor*rtvar*var**(new_power)
         return arg
     
     if isinstance(expr, Add):
@@ -159,7 +187,7 @@ def replace_power_sqrts(expr, var):
             new += change_term(arg)
     elif isinstance(expr, Mul):
         new = change_term(expr)
-    return new
+    return new, assignments, expressions
 
 def recursive_find_power(expr, var, powers=None, selector=lambda x: True):
     '''Recursively find all powers of `var` in `expr`. Optionally, a selection
@@ -357,13 +385,17 @@ def replace_fracpowers(expr, var):
 
     
 def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True, fracpows=True):
-    expr = replace_power_sqrts(expr, var)
-    expr = replace_inv(expr, var, var_inv)
-    if horner:
-        expr = horner_expr(expr, var)
-        expr = horner_expr(expr, var_inv)
     assignments = []
     expressions = []
+    expr = replace_inv(expr, var, var_inv)
+    
+    expr, assign_tmp, expr_tmp = replace_power_sqrts(expr, var)
+    assignments += assign_tmp
+    expressions += expr_tmp
+    if horner:
+        expr = horner_expr(expr, var)
+        if var_inv in expr.free_symbols:
+            expr = horner_expr(expr, var_inv)
     if intpows:
         expr, assign_tmp, expr_tmp = replace_intpowers(expr, var)
         assignments += assign_tmp
@@ -387,7 +419,7 @@ def optimize_expression(expr, variables, inverse_variables, horner=True,
     >>> tau, delta, tau_inv, delta_inv = symbols('tau, delta, tau_inv, delta_inv')
     >>> expr = 17.2752665749999998*tau - 0.000195363419999999995*tau**1.5 + log(delta) + 2.49088803199999997*log(tau) + 0.791309508999999967*log(1 - exp(-25.36365*tau)) + 0.212236767999999992*log(1 - exp(-16.90741*tau)) - 0.197938903999999999*log(exp(87.31279*tau) + 0.666666666666667) - 13.8419280760000003 - 0.000158860715999999992/tau - 0.0000210274769000000003/tau**2 + 6.05719400000000021e-8/tau**3
     >>> optimize_expression(expr, [tau,delta], [tau_inv, delta_inv])[0]
-    17.275266575*tau - 0.00019536342*tau*sqrt(tau) + tau_inv*(tau_inv*(6.057194e-8*tau_inv - 2.10274769e-5) - 0.000158860716) + log(delta) + 2.490888032*log(tau) + 0.791309509*log(1 - exp(-25.36365*tau)) + 0.212236768*log(1 - exp(-16.90741*tau)) - 0.197938904*log(exp(87.31279*tau) + 0.666666666666667) - 13.841928076
+    -0.00019536342*tau*taurt2 + 17.275266575*tau + tau_inv*(tau_inv*(6.057194e-8*tau_inv - 2.10274769e-5) - 0.000158860716) + log(delta) + 2.490888032*log(tau) + 0.791309509*log(1 - exp(-25.36365*tau)) + 0.212236768*log(1 - exp(-16.90741*tau)) - 0.197938904*log(exp(87.31279*tau) + 0.666666666666667) - 13.841928076
     
     '''
     assignments = []
