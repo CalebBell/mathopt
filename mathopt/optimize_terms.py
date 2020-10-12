@@ -367,9 +367,22 @@ def replace_fracpowers(expr, var):
     >>> test = simplify_powers_as_fractions(test, delta)
     >>> replace_fracpowers(test, tau)
     (-0.0420533228842*delta**4*tau4_20 + 0.0349008431982*delta**4*tau7_20, [tau_20, tau2_20, tau4_20, tau6_20, tau7_20], [tau**0.05, tau_20*tau_20, tau2_20*tau2_20, tau2_20*tau4_20, tau_20*tau6_20])
+
+    Test case of one power
+    
+    >>> tau, delta, tau_inv, delta_inv = symbols('tau, delta, tau_inv, delta_inv')
+    >>> expr = 0.16*delta*tau**(3/5)*exp(-delta) +0.23*delta/tau**(67/100) - 0.008*delta**4/tau**(4/5)
+    >>> expr = simplify_powers_as_fractions(expr, tau)
+    >>> expr = simplify_powers_as_fractions(expr, delta)
+    >>> expr = replace_inv(expr, tau, tau_inv)
+    >>> replace_fracpowers(expr, tau)
+    (-0.008*delta**4*tau_inv**(4/5) + 0.16*delta*tau**(3/5)*exp(-delta) + 0.23*delta*tau_inv**(67/100), [], [])
+    >>> replace_fracpowers(expr, tau_inv)
+    (-0.008*delta**4*tau_inv80_100 + 0.16*delta*tau**(3/5)*exp(-delta) + 0.23*delta*tau_inv67_100, [tau_inv_100, tau_inv2_100, tau_inv4_100, tau_inv8_100, tau_inv16_100, tau_inv32_100, tau_inv64_100, tau_inv66_100, tau_inv67_100, tau_inv80_100], [tau_inv**0.01, tau_inv_100*tau_inv_100, tau_inv2_100*tau_inv2_100, tau_inv4_100*tau_inv4_100, tau_inv8_100*tau_inv8_100, tau_inv16_100*tau_inv16_100, tau_inv32_100*tau_inv32_100, tau_inv2_100*tau_inv64_100, tau_inv_100*tau_inv66_100, tau_inv16_100*tau_inv64_100])
+
     '''
     fractional_powers = recursive_find_power(expr, var, selector=lambda x: int(x) != x and abs(x)%.25 != 0)
-    if not fractional_powers:
+    if not fractional_powers or len(fractional_powers) == 1:
         return expr, [], []
     fractional_powers = list(sorted(list(fractional_powers)))
     base_power = gcd(fractional_powers)
