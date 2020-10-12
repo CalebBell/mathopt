@@ -352,14 +352,14 @@ def replace_fracpowers(expr, var):
     >>> test = x**2.15*sin(x**3.22)*y+y*x**20
     >>> test = simplify_powers_as_fractions(test, x)
     >>> replace_fracpowers(test, x)
-    (x**20*y + x215_100*y*sin(x322_100), [x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
+    (x**20*y + x215_100*y*sin(x322_100), [x_100, x2_100, x4_100, x5_100, x10_100, x20_100, x40_100, x45_100, x85_100, x170_100, x215_100, x80_100, x160_100, x320_100, x322_100], [x**0.01, x_100*x_100, x2_100*x2_100, x_100*x4_100, x5_100*x5_100, x10_100*x10_100, x20_100*x20_100, x5_100*x40_100, x40_100*x45_100, x85_100*x85_100, x45_100*x170_100, x40_100*x40_100, x80_100*x80_100, x160_100*x160_100, x2_100*x320_100])
 
     >>> tau, delta = symbols('tau, delta')
     >>> test = - 0.042053322884200002*delta**4*tau**0.200000000000000011 + 0.0349008431981999989*delta**4*tau**0.349999999999999978 
     >>> test = simplify_powers_as_fractions(test, tau)
     >>> test = simplify_powers_as_fractions(test, delta)
     >>> replace_fracpowers(test, tau)
-    (-0.0420533228842*delta**4*tau4_20 + 0.0349008431982*delta**4*tau7_20, [tau2_20, tau4_20, tau6_20, tau7_20], [tau_20*tau_20, tau2_20*tau2_20, tau2_20*tau4_20, tau_20*tau6_20])
+    (-0.0420533228842*delta**4*tau4_20 + 0.0349008431982*delta**4*tau7_20, [tau_20, tau2_20, tau4_20, tau6_20, tau7_20], [tau**0.05, tau_20*tau_20, tau2_20*tau2_20, tau2_20*tau4_20, tau_20*tau6_20])
     '''
     fractional_powers = recursive_find_power(expr, var, selector=lambda x: int(x) != x and abs(x)%.25 != 0)
     if not fractional_powers:
@@ -369,7 +369,7 @@ def replace_fracpowers(expr, var):
     powers_int = [int(i/base_power) for i in fractional_powers]
     prefix = '_' + str(base_power.numerator()) 
     suffix = '_' + str(base_power.denominator())
-    var_suffix = symbols(var.name + prefix)
+    var_suffix = symbols(var.name + suffix)
     
     chain_length, chain = minimum_addition_chain_multi_heuristic(powers_int, small_chain_length=6)
     assignments, expressions = integer_chain_symbolic_path(chain, var, suffix)
@@ -381,6 +381,9 @@ def replace_fracpowers(expr, var):
     for power, replacement in zip(fractional_powers[::-1], replacement_vars[::-1]):
 #        iterate from highest to low
         expr = expr.replace(var**power, replacement)
+        
+    assignments.insert(0, var_suffix)
+    expressions.insert(0, var**float(base_power))
     return expr, assignments, expressions
 
     
