@@ -127,7 +127,7 @@ def minimum_addition_chain_multi(powers):
         base.clear()
     return min_lengh, list(min_steps)
 
-def minimum_addition_chain_multi_heuristic(powers, small_chain_length=6):
+def minimum_addition_chain_multi_heuristic(powers, small_chain_length=0):
     r'''Given a series of different exponents of a variable, determine the
     minimum addition chain length which computes all of the powers.
     
@@ -141,7 +141,8 @@ def minimum_addition_chain_multi_heuristic(powers, small_chain_length=6):
     powers : list[int]
         Exponents to find addition chain for, [-]
     small_chain_length : int
-        The number of variables rp process at once
+        The number of variables to process at once; set to zero to determine
+        this automatically, [-]
 
     Returns
     -------
@@ -163,7 +164,14 @@ def minimum_addition_chain_multi_heuristic(powers, small_chain_length=6):
     min_lengh = 1000000000
     min_steps = None
     powers = list(sorted(powers))
-    
+    power_option_counts = [len(tabulated_addition_chains[p]) for p in powers]
+    if small_chain_length == 0:
+        start = 1
+        for i, val in enumerate(power_option_counts):
+            if val*start > 1e6:
+                small_chain_length = i
+                break
+            start *= val
     small_power_chain = powers[0:small_chain_length]
 #    small_power_chain = [i for i in powers if i < max_power_small][0:small_chain_length]
     small_length, small_steps = minimum_addition_chain_multi(small_power_chain)

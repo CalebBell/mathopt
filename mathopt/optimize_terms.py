@@ -369,7 +369,7 @@ def replace_intpowers(expr, var):
     '''
     powers = list(sorted(list(recursive_find_power(expr, var, selector=lambda x: int(x) == x))))
     powers_int = [int(i) for i in powers]
-    chain_length, chain = minimum_addition_chain_multi_heuristic(powers_int, small_chain_length=6)
+    chain_length, chain = minimum_addition_chain_multi_heuristic(powers_int, small_chain_length=0)
     assignments, expressions = integer_chain_symbolic_path(chain, var)
     replacement_vars = [make_pow_sym(var, p) for p in powers]
     for power, replacement in zip(powers[::-1], replacement_vars[::-1]):
@@ -421,7 +421,7 @@ def replace_fracpowers(expr, var):
     suffix = '_' + str(base_power.denominator())
     var_suffix = symbols(var.name + suffix)
     
-    chain_length, chain = minimum_addition_chain_multi_heuristic(powers_int, small_chain_length=6)
+    chain_length, chain = minimum_addition_chain_multi_heuristic(powers_int, small_chain_length=0)
     assignments, expressions = integer_chain_symbolic_path(chain, var, suffix)
     replacement_vars = [make_pow_sym(var, p, suffix) for p in powers_int]
     
@@ -446,6 +446,9 @@ def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True, f
     expr = replace_inv(expr, var, var_inv)
     
     expr, assign_tmp, expr_tmp = replace_power_sqrts(expr, var)
+    assignments += assign_tmp
+    expressions += expr_tmp
+    expr, assign_tmp, expr_tmp = replace_power_sqrts(expr, var_inv)
     assignments += assign_tmp
     expressions += expr_tmp
     if horner:
