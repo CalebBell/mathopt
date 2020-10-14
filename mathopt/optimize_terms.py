@@ -32,53 +32,54 @@ __all__ = ['replace_inv', 'replace_power_sqrts', 'horner_expr',
            'optimize_expression_for_var', 'optimize_expression',
            'recursive_find_power', 'make_pow_sym', 'replace_intpowers',
            'replace_fracpowers',
-           'integer_chain_symbolic_path', 'simplify_powers_as_fractions']
+           'integer_chain_symbolic_path', 'simplify_powers_as_fractions',
+           'singleton_variables_inline']
 
-def replace_inv(expr, var, var_inv):
+def replace_inv(expr, var, assignments=None, expressions=None):
     '''Accepts and expression, and replaces a specified variable and replaces
     it by its inverse where ever its inverse is used.
     
     Cases where replacement happens:
         
-    >>> x, x_inv, y = symbols('x, x_inv, y')
-    >>> replace_inv(x + 1/x, x, x_inv)
+    >>> x, y = symbols('x, y')
+    >>> replace_inv(x + 1/x, x)[0]
     x + x_inv
     
-    >>> replace_inv(sin(x) + sin(1)/(5*x**1*y), x, x_inv)
+    >>> replace_inv(sin(x) + sin(1)/(5*x**1*y), x)[0]
     x_inv*sin(1)/(5*y) + sin(x)
     
-    >>> tau, delta, tau_inv = symbols('tau, delta, tau_inv')
+    >>> tau, delta = symbols('tau, delta')
     >>> expr = 0.000233594806142*delta**11*tau**3.25*exp(-delta**2)
-    >>> replace_inv(expr, tau, tau_inv)
+    >>> replace_inv(expr, tau)[0]
     0.000233594806142*delta**11*tau**3.25*exp(-delta**2)
 
     Case where replacement wasn't happening because of a bracket:
         
-    >>> tau, delta, tau_inv, delta_inv = symbols('tau, delta, tau_inv, delta_inv')
+    >>> tau, delta = symbols('tau, delta')
     >>> expr = 0.16*delta*tau**(3/5)*exp(-delta) +0.23*delta/tau**(67/100) - 0.008*delta**4/tau**(4/5)
     >>> expr = simplify_powers_as_fractions(expr, tau)
     >>> expr = simplify_powers_as_fractions(expr, delta)
-    >>> replace_inv(expr, tau, tau_inv)
+    >>> replace_inv(expr, tau)[0]
     -0.008*delta**4*tau_inv**(4/5) + 0.16*delta*tau**(3/5)*exp(-delta) + 0.23*delta*tau_inv**(67/100)
-    
-    Case where replacement was not happening because of depth
-
-    >>> expr = delta*(0.1*delta**10*tau**(5/4)*exp(-delta**2) - 0.03*delta**5*tau_inv**(3/4)*exp(-delta))
-    >>> replace_power_sqrts(expr, tau)
-    (delta*(0.1*delta**10*tau*taurt4*exp(-delta**2) - 0.03*delta**5*tau_inv**0.75*exp(-delta)), [taurt2, taurt4], [sqrt(tau), sqrt(taurt2)])
         
     Cases where replacement does not happen
     
-    >>> replace_inv(sin(x) + 1/sin(x), x, x_inv)
+    >>> replace_inv(sin(x) + 1/sin(x), x)[0]
     sin(x) + 1/sin(x)
     
+    >>> tau, tau_inv, delta = symbols('tau, tau_inv, delta')
     >>> expr = tau_inv*(tau_inv*(tau_inv*(4.20549538e-5 - 1.8171582e-7*tau_inv) + 0.000158860716) + 2.490888032)
-    >>> replace_inv(expr, delta, delta_inv)
+    >>> replace_inv(expr, delta)[0]
     tau_inv*(tau_inv*(tau_inv*(4.20549538e-5 - 1.8171582e-7*tau_inv) + 0.000158860716) + 2.490888032)
     '''
+    if assignments is None:
+        assignments = []
+    if expressions is None:
+        expressions = []
     new = 0
     find_pow_inv = str(var)+'**-'
     find_inv = str(var)
+    var_inv = symbols(var.name + '_inv') # Make it even if we don't need it
 
     def change_term(arg):
         numer, denom = fraction(arg)
@@ -94,12 +95,16 @@ def replace_inv(expr, var, var_inv):
     elif isinstance(expr, Mul):
         new = 1
         for arg in expr.args:
-            new *= replace_inv(arg, var, var_inv)
+            new *= replace_inv(arg, var)[0]
     elif isinstance(expr, (Number, Pow, Function, Symbol)) or 1:
         new = expr
     else:
         new = 0
-    return new
+    
+    if var_inv in new.free_symbols:
+        assignments.append(var_inv)
+        expressions.append(1.0/var)
+    return new, assignments, expressions
 
 
 def replace_power_sqrts(expr, var):
@@ -129,6 +134,13 @@ def replace_power_sqrts(expr, var):
     
     >>> replace_power_sqrts(x**1.5*y+ x**1.5, x)
     (x*xrt2*y + x*xrt2, [xrt2], [sqrt(x)])
+
+    
+    Case where replacement was not happening because of depth
+    >>> delta, tau, tau_inv = symbols('delta, tau, tau_inv')
+    >>> expr = delta*(0.1*delta**10*tau**(5/4)*exp(-delta**2) - 0.03*delta**5*tau_inv**(3/4)*exp(-delta))
+    >>> replace_power_sqrts(expr, tau)
+    (delta*(0.1*delta**10*tau*taurt4*exp(-delta**2) - 0.03*delta**5*tau_inv**0.75*exp(-delta)), [taurt2, taurt4], [sqrt(tau), sqrt(taurt2)])
     '''
     assignments = []
     expressions = []
@@ -292,6 +304,36 @@ def simplify_powers_as_fractions(expr, var, max_denom=1000):
     else:
         return expr
 
+#def convert_numbers_to_floats(expr):
+#    '''
+#    
+#    >>> x, y = symbols('x, y')
+#    >>> expr = Rational("1.5")
+#    >>> convert_numbers_to_floats(expr)
+#    1.5
+#    >>> expr = sin(Rational("1.5")*x)
+#    '''
+#    def change_term(arg):
+#        if isinstance(arg, Number):
+#            return float(arg)
+#        else:
+#            return arg
+#
+#
+#    if isinstance(expr, Add):
+#        base = 0
+#        for i in range(len(expr.args)):
+#            base += change_term(expr.args[i])
+#        return base
+#    elif isinstance(expr, Mul) or isinstance(expr, Pow):
+#        return change_term(expr)
+#    elif isinstance(expr, Function):
+#        return type(expr)(*(convert_numbers_to_floats(v) for v in expr.args))
+#    elif isinstance(expr, Number):
+#        return float(expr)
+#    else:
+#        return expr
+
 def horner_expr(expr, var):
     '''Basic wrapper around sympy's horner which does not raise an exception if
     there is nothing to do.
@@ -330,6 +372,9 @@ def make_pow_sym(var, power, suffix=''):
 def integer_chain_symbolic_path(chain, var, suffix=''):
     '''Returns a tuple of assignments, expressions which can be joined together
     to calculate all of the necessary powers for an operation.
+    
+    Although this function returns UnevaluatedExprs, they can be simplified
+    removed with the simplify() function. 
     
     >>> x = symbols('x')
     >>> chain = [[2], [2, 3], [2, 3, 5, 10, 13], [2, 3, 5, 10, 20]]
@@ -398,7 +443,7 @@ def replace_fracpowers(expr, var):
     >>> expr = 0.16*delta*tau**(3/5)*exp(-delta) +0.23*delta/tau**(67/100) - 0.008*delta**4/tau**(4/5)
     >>> expr = simplify_powers_as_fractions(expr, tau)
     >>> expr = simplify_powers_as_fractions(expr, delta)
-    >>> expr = replace_inv(expr, tau, tau_inv)
+    >>> expr = replace_inv(expr, tau)[0]
     >>> replace_fracpowers(expr, tau)
     (-0.008*delta**4*tau_inv**(4/5) + 0.16*delta*tau**(3/5)*exp(-delta) + 0.23*delta*tau_inv**(67/100), [], [])
     >>> replace_fracpowers(expr, tau_inv)
@@ -440,10 +485,61 @@ def replace_fracpowers(expr, var):
     return expr, assignments, expressions
 
     
-def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True, fracpows=True):
-    assignments = []
-    expressions = []
-    expr = replace_inv(expr, var, var_inv)
+def singleton_variables_inline(assignments, expressions, expr):
+    '''Replaces variables which are used only once by putting them right in
+    the final expression, so they are never stored.
+    
+    >>> delta2, delta4, delta8, delta10, taurt2, taurt4, delta, tau = symbols('delta2, delta4, delta8, delta10, taurt2, taurt4, delta, tau')
+    >>> assignments = [delta2, delta4, delta8, delta10, taurt2, taurt4]
+    >>> expressions = [delta*delta, delta2*delta2, delta4*delta4, delta2*delta8, sqrt(tau), sqrt(taurt2)]
+    >>> expr = delta10*tau*taurt4*(0.018 - 0.0034*delta2)*exp(-delta2)
+    >>> singleton_variables_inline(assignments, expressions, expr)
+    ([delta2, delta4, delta8, taurt2], [delta**2, delta2**2, delta4**2, sqrt(tau)], delta2*delta8*tau*sqrt(taurt2)*(0.018 - 0.0034*delta2)*exp(-delta2))
+    '''
+    pow_count = str(expr).count('**')
+    assignment_use_in_expressions = []
+    assignment_use_in_expr = []
+    
+    new_assignments = []
+    new_expressions = []
+    for v in assignments:
+        assignment_use_in_expr.append(expr.count(v))
+        assignment_use_in_expressions.append(sum(token.count(v) for token in expressions))
+    
+    for assignment, expression, count_expressions, count_expr in zip(assignments, expressions, assignment_use_in_expressions, assignment_use_in_expr):
+        # This code won't work because sympy will consolidate terms
+#         if count_expr + count_expressions > 1:
+#             new_assignments.append(assignment)
+#             new_expressions.append(expression)
+#         elif count_expressions == 1:
+#             for i in range(len(expressions)):
+#                 expressions[i] = expressions[i].replace(assignment, expression)
+#             for i in range(len(new_expressions)):
+#                 new_expressions[i] = new_expressions[i].replace(assignment, expression)
+#         elif count_expr == 1:
+#             expr = expr.replace(assignment, expression)
+
+        # This implementation only removes wasted things from the out expression
+        if count_expr == 1 and count_expressions == 0:
+            expr_tmp = expr.replace(assignment, expression)
+            pow_count_tmp = str(expr_tmp).count('**')
+            
+            if pow_count_tmp > pow_count:
+                # Abort! we accidentally caused a power
+                new_assignments.append(assignment)
+                new_expressions.append(expression)
+            else:
+                pow_count = pow_count_tmp
+                expr = expr_tmp
+        else:
+            new_assignments.append(assignment)
+            new_expressions.append(expression)
+    return new_assignments, new_expressions, expr
+
+def optimize_expression_for_var(expr, var, horner=True, intpows=True, fracpows=True):
+    var_inv = symbols(var.name + '_inv') # Make it even if we don't need it
+
+    expr, assignments, expressions = replace_inv(expr, var)
     
     expr, assign_tmp, expr_tmp = replace_power_sqrts(expr, var)
     assignments += assign_tmp
@@ -473,17 +569,22 @@ def optimize_expression_for_var(expr, var, var_inv, horner=True, intpows=True, f
         
     return expr, assignments, expressions
 
-def optimize_expression(expr, variables, inverse_variables, horner=True,
+def optimize_expression(expr, variables, horner=True,
                         intpows=True, fracpows=True):
     '''
     >>> tau, delta, tau_inv, delta_inv = symbols('tau, delta, tau_inv, delta_inv')
     >>> expr = 17.2752665749999998*tau - 0.000195363419999999995*tau**1.5 + log(delta) + 2.49088803199999997*log(tau) + 0.791309508999999967*log(1 - exp(-25.36365*tau)) + 0.212236767999999992*log(1 - exp(-16.90741*tau)) - 0.197938903999999999*log(exp(87.31279*tau) + 0.666666666666667) - 13.8419280760000003 - 0.000158860715999999992/tau - 0.0000210274769000000003/tau**2 + 6.05719400000000021e-8/tau**3
-    >>> optimize_expression(expr, [tau,delta], [tau_inv, delta_inv])[0]
+    >>> optimize_expression(expr, [tau,delta])[0]
     -0.00019536342*tau*taurt2 + 17.275266575*tau + tau_inv*(tau_inv*(6.057194e-8*tau_inv - 2.10274769e-5) - 0.000158860716) + log(delta) + 2.490888032*log(tau) + 0.791309509*log(1 - exp(-25.36365*tau)) + 0.212236768*log(1 - exp(-16.90741*tau)) - 0.197938904*log(exp(87.31279*tau) + 0.666666666666667) - 13.841928076
     
     >>> expr =  2.490888032/tau + 0.000158860716/tau**2 + 4.20549538e-5/tau**3 - 1.8171582e-7/tau**4
-    >>> optimize_expression(expr, [tau,delta], [tau_inv, delta_inv])[0]
+    >>> optimize_expression(expr, [tau,delta])[0]
     tau_inv*(tau_inv*(tau_inv*(4.20549538e-5 - 1.8171582e-7*tau_inv) + 0.000158860716) + 2.490888032)
+    
+    >>> tau, delta, tau_inv, delta_inv = symbols('tau, delta, tau_inv, delta_inv')
+    >>> expr = delta*(0.1*delta**10*tau**(5/4)*exp(-delta**2) - 0.03*delta**5*tau_inv**(3/4)*exp(-delta))
+    >>> optimize_expression(expr, [delta, tau], horner=False)
+    (delta*(0.1*delta5*tau*sqrt(taurt2)*exp(-delta2)*delta5 - 0.03*delta5*tau_invrt2*tau_invrt4*exp(-delta)), [delta2, delta4, delta5, tau_inv, taurt2, tau_invrt2, tau_invrt4], [delta*delta, delta2*delta2, delta*delta4, 1.0/tau, sqrt(tau), sqrt(tau_inv), sqrt(tau_invrt2)])
     '''
     assignments = []
     expressions = []
@@ -491,8 +592,10 @@ def optimize_expression(expr, variables, inverse_variables, horner=True,
     for var in variables:
         expr = simplify_powers_as_fractions(expr, var)
     
-    for var, var_inv in zip(variables, inverse_variables):
-        expr, assign_tmp, expr_tmp = optimize_expression_for_var(expr, var, var_inv, horner=horner, intpows=intpows, fracpows=fracpows)
+    for var in variables:
+        expr, assign_tmp, expr_tmp = optimize_expression_for_var(expr, var, horner=horner, intpows=intpows, fracpows=fracpows)
         assignments += assign_tmp
         expressions += expr_tmp
+        
+    assignments, expressions, expr = singleton_variables_inline(assignments, expressions, expr)
     return expr, assignments, expressions

@@ -25,7 +25,7 @@ SOFTWARE.
 from __future__ import division
 
 __all__ = ['addition_chain_length', 'tabulated_addition_chains',
-           'minimum_addition_chain_multi', 'minimum_addition_chain_multi_heuristic']
+           'minimum_addition_chain_multi', 'minimum_addition_chain_multi_heuristic', 'bin_chain']
 import os
 from itertools import product, permutations, combinations
 
@@ -58,6 +58,52 @@ shortest_path_costs = {1:1, 2:2, 3:3, 4:3, 5:4, 6:4, 7:5, 8:4, 9:5, 10:5, 11:6, 
                        293:11, 294:11, 295:12, 296:11, 297:11, 298:11, 299:12, 300:11, 301:12, 302:12, 303:12,
                        304:11, 305:12, 306:11, 307:12, 308:11, 309:12, 310:12, 311:12, 312:11, 313:12, 314:12, 
                        315:12, 316:12, 317:12, 318:12, 319:12, 320:10, 321:11, 322:11, 323:11}
+
+def bin_chain(power):
+    r'''Calculates a naive power-of-two exponentiation chain.
+
+    Parameters
+    ----------
+    power : int
+        Exponent, [-]
+
+    Returns
+    -------
+    chain : list[int]
+        List of steps required to compute the powers [-]
+
+    Notes
+    -----
+
+    Examples
+    --------
+    >>> bin_chain(128)
+    [2, 4, 8, 16, 32, 64, 128]
+    >>> bin_chain(133)
+    [2, 4, 8, 16, 32, 64, 128, 132, 133]
+    '''    
+    if power == 1:
+        return [1]
+    elif power == 2:
+        return [2]
+    tree = []
+    accending_2 = 1
+    while accending_2 < power:
+        accending_2 *= 2
+        if accending_2 > power:
+            while tree[-1] != power:
+                for var in tree[::-1]:
+                    if var+tree[-1] <= power:
+                        tree.append(tree[-1] + var)
+                        break
+                if tree[-1] +1 == power:
+                    tree.append(tree[-1] +1)
+                    break
+            return tree
+        else:
+            tree.append(accending_2)
+    
+    return tree
 
 def addition_chain_length(power):
     r'''Calculates the number of multiplies required to calculate a power using
@@ -158,7 +204,12 @@ def minimum_addition_chain_multi_heuristic(powers, small_chain_length=0):
     --------
     >>> minimum_addition_chain_multi_heuristic([3, 5, 11])
     (5, [[2, 3], [2, 3, 5], [2, 3, 5, 10, 11]])
-
+    
+    Case which was previously too slow
+    
+    >>> powers = [140, 165, 199, 205, 220, 265, 267, 280, 285]
+    >>> minimum_addition_chain_multi_heuristic(powers, small_chain_length=0)[0]
+    27
     
     '''
     min_lengh = 1000000000

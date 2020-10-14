@@ -1,6 +1,14 @@
 from fluids.numerics import assert_close, assert_close1d
 from mathopt.addition_chain import *
 
+
+def test_bin_chain():
+    assert bin_chain(25)  == [2, 4, 8, 16, 24, 25]
+    assert bin_chain(512) == [2, 4, 8, 16, 32, 64, 128, 256, 512]
+    assert bin_chain(514) == [2, 4, 8, 16, 32, 64, 128, 256, 512, 514]
+    assert bin_chain(515) == [2, 4, 8, 16, 32, 64, 128, 256, 512, 514, 515]
+    assert bin_chain(89) == [2, 4, 8, 16, 32, 64, 80, 88, 89]
+    
 def test_tabulated_addition_chains():
     assert 1 not in tabulated_addition_chains
     assert 0 not in tabulated_addition_chains
