@@ -369,7 +369,7 @@ def make_pow_sym(var, power, suffix=''):
     sym = symbols(name)
     return sym
 
-def integer_chain_symbolic_path(chain, var, suffix=''):
+def integer_chain_symbolic_path(chain, var, suffix='', factor=1):
     '''Returns a tuple of assignments, expressions which can be joined together
     to calculate all of the necessary powers for an operation.
     
@@ -385,14 +385,14 @@ def integer_chain_symbolic_path(chain, var, suffix=''):
     expressions = []
     for l in chain:
         for i, v in enumerate(l):
-            to_add_asign = make_pow_sym(var, v, suffix)
+            to_add_asign = make_pow_sym(var, v*factor, suffix)
             if i == 0:
                 assert v == 2
-                to_add_expr = UnevaluatedExpr(make_pow_sym(var, 1, suffix))*make_pow_sym(var, 1, suffix)
+                to_add_expr = UnevaluatedExpr(make_pow_sym(var, 1*factor, suffix))*make_pow_sym(var, 1*factor, suffix)
             else:
                 prev = l[i-1]
                 delta = v-l[i-1]
-                to_add_expr = UnevaluatedExpr(make_pow_sym(var, prev, suffix))*make_pow_sym(var, delta, suffix)
+                to_add_expr = UnevaluatedExpr(make_pow_sym(var, prev*factor, suffix))*make_pow_sym(var, delta*factor, suffix)
             
             if to_add_asign not in assignments:
                 assignments.append(to_add_asign)
@@ -454,6 +454,14 @@ def replace_fracpowers(expr, var):
     >>> replace_fracpowers(expr, tau)
     (-0.5*delta*tau260_100*exp(-delta**2) - 0.16*delta*tau60_100*exp(-delta) - 1.6*delta*tau_100, [tau_100, tau2_100, tau4_100, tau8_100, tau16_100, tau20_100, tau40_100, tau60_100, tau32_100, tau64_100, tau128_100, tau256_100, tau260_100], [tau**0.01, tau_100*tau_100, tau2_100*tau2_100, tau4_100*tau4_100, tau8_100*tau8_100, tau4_100*tau16_100, tau20_100*tau20_100, tau20_100*tau40_100, tau16_100*tau16_100, tau32_100*tau32_100, tau64_100*tau64_100, tau128_100*tau128_100, tau4_100*tau256_100])
 
+    Test case of different numerator
+    
+    >>> T = symbols('T')
+    >>> test = -410.5553424401*T**(0.183) - 0.0297917594240699*T**(.048) + 0.000198275966635743*T**(0.237)
+    >>> test = simplify_powers_as_fractions(test, T)
+    >>> replace_fracpowers(test, T)
+    (-410.5553424401*T183_1000 + 0.000198275966635743*T237_1000 - 0.0297917594240699*T48_1000, [T3_1000, T6_1000, T12_1000, T24_1000, T48_1000, T27_1000, T54_1000, T78_1000, T156_1000, T183_1000, T237_1000], [T**0.003, T3_1000*T3_1000, T6_1000*T6_1000, T12_1000*T12_1000, T24_1000*T24_1000, T3_1000*T24_1000, T27_1000*T27_1000, T24_1000*T54_1000, T78_1000*T78_1000, T27_1000*T156_1000, T54_1000*T183_1000])
+
     '''
     fractional_powers = recursive_find_power(expr, var, selector=lambda x: int(x) != x and abs(x)%.25 != 0)
     if not fractional_powers or len(fractional_powers) == 1:
@@ -464,11 +472,14 @@ def replace_fracpowers(expr, var):
     powers_int = [i for i in powers_int if i != 1] # Remove the base_power if it appears as it is handled separately
     prefix = '_' + str(base_power.numerator()) 
     suffix = '_' + str(base_power.denominator())
-    var_suffix = symbols(var.name + suffix)
+    if base_power.numerator() == 1:
+        var_suffix = symbols(var.name + suffix)
+    else:
+        var_suffix = symbols(var.name + str(base_power.numerator()) + suffix)
     
     chain_length, chain = minimum_addition_chain_multi_heuristic(powers_int, small_chain_length=0)
-    assignments, expressions = integer_chain_symbolic_path(chain, var, suffix)
-    replacement_vars = [make_pow_sym(var, p, suffix) for p in powers_int]
+    assignments, expressions = integer_chain_symbolic_path(chain, var, suffix, factor=base_power.numerator())
+    replacement_vars = [make_pow_sym(var, p*base_power.numerator(), suffix) for p in powers_int]
     
 #    subs = {var**power: replacement for power, replacement in zip(fractional_powers[::-1], replacement_vars[::-1])}
 #    subs = {var**power: replacement for power, replacement in zip(fractional_powers, replacement_vars)}
