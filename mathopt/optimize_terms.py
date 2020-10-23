@@ -35,6 +35,24 @@ __all__ = ['replace_inv', 'replace_power_sqrts', 'horner_expr',
            'integer_chain_symbolic_path', 'simplify_powers_as_fractions',
            'singleton_variables_inline']
 
+
+def remove_dup_assignments(assignments, expressions):
+    new_assignments = []
+    new_expressions = []
+    assign_hashes = set([])
+    assign_exprs = set([])
+    for a, e in zip(assignments, expressions):
+        ha = hash(a)
+        he = hash(e)
+        if ha in assign_hashes and he not in assign_exprs:
+            raise ValueError("Duplicate not equal")
+        if ha not in assign_hashes:
+            new_assignments.append(a)
+            new_expressions.append(e)
+        assign_hashes.add(ha)
+        assign_exprs.add(he)
+    return new_assignments, new_expressions
+
 def replace_inv(expr, var, assignments=None, expressions=None):
     '''Accepts and expression, and replaces a specified variable and replaces
     it by its inverse where ever its inverse is used.
@@ -132,15 +150,27 @@ def replace_power_sqrts(expr, var):
     >>> replace_power_sqrts(x**-.75*y, x)
     (xrt34inv*y, [xrt2, xrt4, xrt34inv], [sqrt(x), sqrt(xrt2), 1/(xrt2*xrt4)])
     
-    >>> replace_power_sqrts(x**1.5*y+ x**1.5, x)
-    (x*xrt2*y + x*xrt2, [xrt2], [sqrt(x)])
+    >>> expr, a, b = replace_power_sqrts(x**1.5*y+ x**1.5, x)
+    >>> expr
+    x*xrt2*y + x*xrt2
+    >>> remove_dup_assignments(a, b)
+    ([xrt2], [sqrt(x)])
 
     
     Case where replacement was not happening because of depth
+    
     >>> delta, tau, tau_inv = symbols('delta, tau, tau_inv')
     >>> expr = delta*(0.1*delta**10*tau**(5/4)*exp(-delta**2) - 0.03*delta**5*tau_inv**(3/4)*exp(-delta))
     >>> replace_power_sqrts(expr, tau)
     (delta*(0.1*delta**10*tau*taurt4*exp(-delta**2) - 0.03*delta**5*tau_inv**0.75*exp(-delta)), [taurt2, taurt4], [sqrt(tau), sqrt(taurt2)])
+
+    Similar case
+    
+    >>> T, Tc, tau, T_inv, T2 = symbols('T, Tc, tau, T_inv, T2')
+    >>> dPsat = T*(T*(-1.80122502*Tc*tau**(15/2) - 22.6807411*Tc*tau**(7/2)) - 13.)/Tc**3
+    >>> replace_power_sqrts(dPsat, tau)
+    (T*(T*(-1.80122502*Tc*tau**7*taurt2 - 22.6807411*Tc*tau**3*taurt2) - 13.0)/Tc**3, [taurt2, taurt2], [sqrt(tau), sqrt(tau)])
+
     '''
     assignments = []
     expressions = []
@@ -216,8 +246,12 @@ def replace_power_sqrts(expr, var):
         return arg
     
     if isinstance(expr, Add):
+        new = 0
         for arg in expr.args:
-            new += change_term(arg, assignments, expressions)
+            to_mul, temp_assign, temp_expr = replace_power_sqrts(arg, var)
+            new += to_mul
+            assignments += temp_assign
+            expressions += temp_expr
     elif isinstance(expr, Pow):
         new = change_term(expr, assignments, expressions)
     elif isinstance(expr, Mul):
@@ -228,8 +262,20 @@ def replace_power_sqrts(expr, var):
             new *= to_mul
             assignments += temp_assign
             expressions += temp_expr
-    elif isinstance(expr, (Number, Pow, Function, Symbol)) or 1:
+    elif isinstance(expr, Function):
+        args = []
+        temp_assign = []
+        temp_expr = []
+        for v in expr.args:
+            to_arg, temp_assign, temp_expr = replace_power_sqrts(v, var)
+            assignments += temp_assign
+            expressions += temp_expr
+            args.append(to_arg)
+
+        return type(expr)(*args), assignments, expressions
+    elif isinstance(expr, (Number, Pow, Symbol)) or 1:
         return expr, [], []
+    
     return new, assignments, expressions
 
 def recursive_find_power(expr, var, powers=None, selector=lambda x: True):
@@ -609,4 +655,5 @@ def optimize_expression(expr, variables, horner=True,
         expressions += expr_tmp
         
     assignments, expressions, expr = singleton_variables_inline(assignments, expressions, expr)
+    assignments, expressions = remove_dup_assignments(assignments, expressions)
     return expr, assignments, expressions
